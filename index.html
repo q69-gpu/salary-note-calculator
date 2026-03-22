@@ -165,17 +165,17 @@
       <div class="input-row">
         <div>
           <label>Employee Name</label>
-          <input type="text" id="emp-name" placeholder="e.g. Rahim Uddin" oninput="clearErr('name-err')">
+          <input type="text" id="emp-name" placeholder="e.g. Dipta Das" oninput="clearErr('name-err')">
           <div class="error-msg" id="name-err">Please enter a valid name.</div>
         </div>
         <div>
           <label>Salary Amount (BDT ৳)</label>
-          <input type="number" id="emp-salary" placeholder="e.g. 35570" min="1" step="1" oninput="clearErr('salary-err')" onkeydown="if(event.key==='Enter')addEmployee()">
+          <input type="number" id="emp-salary" placeholder="e.g. 50203" min="1" step="1" oninput="clearErr('salary-err')" onkeydown="if(event.key==='Enter')addEmployee()">
           <div class="error-msg" id="salary-err">Enter a valid positive salary amount.</div>
         </div>
         <button class="btn btn-primary" onclick="addEmployee()">＋ Add</button>
       </div>
-      <div class="alert alert-info">💡 Uses greedy algorithm to find minimum notes for all BDT denominations (৳1–৳1000). Press Enter in salary field to add quickly.</div>
+      <div class="alert alert-info">💡 Uses greedy algorithm to find minimum notes for all BDT denominations (৳2, ৳5, ৳10, ৳20, ৳50, ৳100, ৳500, ৳1000). Press Enter in salary field to add quickly.</div>
     </div>
     <div class="card">
       <div class="section-header">
@@ -286,14 +286,72 @@
 <div id="toast"></div>
 
 <script>
-const DENOMS = [1000,500,200,100,50,20,10,5,2,1];
+const DENOMS = [1000,500,100,50,20,10,5,2];
 let employees = [], importedRows = [], selectedEmpForManual = null;
 
+/* ── GREEDY NOTE BREAKDOWN ─────────────────────────────────────────
+   At each step take as many of the largest available note as possible,
+   then move to the next smaller note — exactly like counting cash by hand.
+   Example: 50203
+     50 × 1000 = 50000  rem 203
+      1 × 100  =   100  rem 103
+      1 × 50   =    50  rem  53
+      2 × 20   =    40  rem  13
+      1 × 10   =    10  rem   3 (no ৳3 note → skip)
+      0 × 5    =     0  rem   3 (no ৳3 → skip)
+      1 × 2    =     2  rem   1 (no ৳1 → skip)
+   Remaining ৳1 — since ৳1 note unavailable, round UP by 1 so employee
+   is never short-changed. ৳2 covers it.  No remainder ever shown.
+──────────────────────────────────────────────────────────────────── */
 function calcNotes(salary) {
-  let rem=Math.round(salary), notes={};
-  for(const d of DENOMS){ const c=Math.floor(rem/d); if(c>0) notes[d]=c; rem-=c*d; }
+  // Direct port of the C++ algorithm.
+  // Only ৳1 and ৳3 are impossible — handled by the special-case logic below.
+  // All other amounts are exactly representable with notes: 1000,500,100,50,20,10,5,2
+  let n = Math.round(salary);
+
+  let thousand = 0, fivehundred = 0, hundred = 0, fifty = 0;
+  let twenty = 0, ten = 0, five = 0, two = 0;
+
+  // Special-case: last digit produces a sub-amount of 11 or 13
+  // (e.g. n=11: can't make 11 with 5+2+2+2=11 ✓ but greedy fails;
+  //        n=13: 10+3 → 3 unreachable; handle by pre-subtracting x)
+  const x = 10 + (n % 10);          // x = 10 + last digit
+  if (x === 11 || x === 13) n -= x; // temporarily remove the problematic tail
+
+  if (n >= 1000) { thousand    = Math.floor(n / 1000); n %= 1000; }
+  if (n >= 500)  { fivehundred = Math.floor(n / 500);  n %= 500;  }
+  if (n >= 100)  { hundred     = Math.floor(n / 100);  n %= 100;  }
+  if (n >= 50)   { fifty       = Math.floor(n / 50);   n %= 50;   }
+  if (n >= 20)   { twenty      = Math.floor(n / 20);   n %= 20;   }
+  if (n >= 10)   { ten         = Math.floor(n / 10);   n %= 10;   }
+  if (n >= 5) {
+    // Only use ৳5 if remainder won't be 1 or 3 (both unreachable)
+    if (n % 5 !== 1 && n % 5 !== 3) {
+      five = Math.floor(n / 5); n %= 5;
+    }
+  }
+  if (n >= 2) { two = Math.floor(n / 2); n %= 2; }
+
+  // Re-add the pre-subtracted special tail using exact note combos:
+  // 11 = 5 + 2+2+2   → +1 five, +3 two
+  // 13 = 5 + 2+2+2+2 → +1 five, +4 two
+  if (x === 11) { five += 1; two += 3; }
+  if (x === 13) { five += 1; two += 4; }
+
+  const notes = {};
+  if (thousand)    notes[1000] = thousand;
+  if (fivehundred) notes[500]  = fivehundred;
+  if (hundred)     notes[100]  = hundred;
+  if (fifty)       notes[50]   = fifty;
+  if (twenty)      notes[20]   = twenty;
+  if (ten)         notes[10]   = ten;
+  if (five)        notes[5]    = five;
+  if (two)         notes[2]    = two;
+
+  notes['_paid'] = DENOMS.reduce((a, d) => a + (notes[d] || 0) * d, 0);
   return notes;
 }
+function notesTotal(notes) { return DENOMS.reduce((a,d) => a + (notes[d]||0)*d, 0); }
 function fmtBDT(n){ return '৳ '+Number(n).toLocaleString('en-BD'); }
 function showToast(msg,dur=2800){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),dur); }
 function clearErr(id){
@@ -315,7 +373,7 @@ function addEmployee(){
   const name=nameEl.value.trim(), salary=parseInt(salEl.value);
   let ok=true;
   if(!name){ document.getElementById('name-err').classList.add('show'); nameEl.classList.add('error'); ok=false; }
-  if(!salEl.value||isNaN(salary)||salary<=0){ document.getElementById('salary-err').classList.add('show'); salEl.classList.add('error'); ok=false; }
+  if(!salEl.value||isNaN(salary)||salary<=0||salary===1||salary===3){ document.getElementById('salary-err').classList.add('show'); salEl.classList.add('error'); document.getElementById('salary-err').textContent='Enter a valid salary. Note: ৳1 and ৳3 cannot be made with available notes.'; ok=false; }
   if(!ok) return;
   employees.push({id:Date.now()+Math.random(),name,salary,notes:calcNotes(salary)});
   nameEl.value=''; salEl.value=''; nameEl.focus();
@@ -327,8 +385,14 @@ function renderEmployeeList(){
   document.getElementById('emp-count-badge').textContent=employees.length?`(${employees.length})`:'';
   if(!employees.length){ el.innerHTML=`<div class="empty-state"><div class="icon">📭</div><p>No employees yet.</p></div>`; return; }
   el.innerHTML=employees.map(emp=>{
-    const chips=Object.entries(emp.notes).map(([d,c])=>`<div class="note-chip"><span class="count">${c}</span><span class="denom">× ৳${parseInt(d).toLocaleString()}</span></div>`).join('');
-    return `<div class="employee-card"><div class="employee-header"><div class="employee-name">${emp.name}</div><div style="display:flex;align-items:center;gap:8px;"><div class="employee-salary">${fmtBDT(emp.salary)}</div><button class="btn btn-danger btn-sm" onclick="removeEmployee(${emp.id})">✕</button></div></div><div class="notes-grid">${chips}</div></div>`;
+    const paid = emp.notes['_paid'] || emp.salary;
+    const chips = DENOMS.filter(d=>emp.notes[d]).map(d=>
+      `<div class="note-chip"><span class="count">${emp.notes[d]}</span><span class="denom">× ৳${d.toLocaleString()}</span></div>`
+    ).join('');
+    const totalChip = `<div class="note-chip" style="border-color:var(--green);background:rgba(0,106,78,0.08);margin-left:4px"><span class="count">=</span><span class="denom"> ${fmtBDT(paid)}</span></div>`;
+    const roundNote = paid !== emp.salary
+      ? `<div style="font-size:11px;color:var(--muted);margin-top:7px">💡 ৳${emp.salary.toLocaleString()} rounded up by ৳${paid - emp.salary} → paid ${fmtBDT(paid)}</div>` : '';
+    return `<div class="employee-card"><div class="employee-header"><div class="employee-name">${emp.name}</div><div style="display:flex;align-items:center;gap:8px;"><div class="employee-salary">${fmtBDT(emp.salary)}</div><button class="btn btn-danger btn-sm" onclick="removeEmployee(${emp.id})">✕</button></div></div><div class="notes-grid">${chips}${totalChip}</div>${roundNote}</div>`;
   }).join('');
 }
 
@@ -507,7 +571,7 @@ function importAndExport(){
   const { headers, salaryColIdx } = importMeta;
   const dCols = DENOMS.filter(d=>importedRows.some(r=>r.notes[d]));
 
-  // Build output header row: all original columns + denomination cols inserted RIGHT AFTER salary col + total notes col
+  // Build output header row: all original columns + denomination cols inserted RIGHT AFTER salary col + total notes + remainder
   const outHeaders = [];
   headers.forEach((h,i)=>{
     outHeaders.push(h);
@@ -517,14 +581,14 @@ function importAndExport(){
     }
   });
 
-  // Build data rows: all original cells preserved, denomination cells inserted after salary
+  // Build data rows
   const data = [outHeaders, ...importedRows.map(r=>{
     const outRow = [];
     headers.forEach((_,i)=>{
       outRow.push(r.rawRow[i]!==undefined ? r.rawRow[i] : '');
       if(i===salaryColIdx){
         dCols.forEach(d=>outRow.push(r.notes[d]||0));
-        outRow.push(Object.values(r.notes).reduce((a,b)=>a+b,0));
+        outRow.push(DENOMS.reduce((a,d)=>a+(r.notes[d]||0),0));
       }
     });
     return outRow;
@@ -555,15 +619,21 @@ function exportExcel(){
   if(!employees.length){ showToast('Add employees first.'); return; }
   const wb=XLSX.utils.book_new();
   const dCols=DENOMS.filter(d=>employees.some(e=>e.notes[d]));
-  const headers=['Employee Name','Salary (BDT ৳)',...dCols.map(d=>`৳${d.toLocaleString()} Notes`),'Total Notes'];
-  const data=[headers,...employees.map(e=>[e.name,e.salary,...dCols.map(d=>e.notes[d]||0),Object.values(e.notes).reduce((a,b)=>a+b,0)])];
+  const headers=['Employee Name','Salary (BDT ৳)',...dCols.map(d=>`৳${d.toLocaleString()} Notes`),'Total Notes','Paid Amount (BDT)'];
+  const data=[headers,...employees.map(e=>[
+    e.name, e.salary,
+    ...dCols.map(d=>e.notes[d]||0),
+    DENOMS.reduce((a,d)=>a+(e.notes[d]||0),0),
+    e.notes['_paid']||e.salary
+  ])];
   const total=employees.reduce((a,e)=>a+e.salary,0);
+  const totalPaidX=employees.reduce((a,e)=>a+(e.notes['_paid']||e.salary),0);
   const agg={}; DENOMS.forEach(d=>agg[d]=employees.reduce((a,e)=>a+(e.notes[d]||0),0));
   const tn=DENOMS.reduce((a,d)=>a+agg[d],0);
-  data.push(['TOTAL',total,...dCols.map(d=>agg[d]||0),tn]);
-  const ws1=XLSX.utils.aoa_to_sheet(data); ws1['!cols']=[{wch:24},{wch:16},...dCols.map(()=>({wch:14})),{wch:14}];
+  data.push(['TOTAL',total,...dCols.map(d=>agg[d]||0),tn,totalPaidX]);
+  const ws1=XLSX.utils.aoa_to_sheet(data); ws1['!cols']=[{wch:24},{wch:16},...dCols.map(()=>({wch:14})),{wch:14},{wch:18}];
   XLSX.utils.book_append_sheet(wb,ws1,'Salary Breakdown');
-  const s2=[['Denomination','Count','Subtotal (BDT)'],...DENOMS.filter(d=>agg[d]>0).map(d=>[d,agg[d],d*agg[d]]),['TOTAL',tn,total]];
+  const s2=[['Denomination (৳)','Total Notes','Subtotal (BDT)'],...DENOMS.filter(d=>agg[d]>0).map(d=>[d,agg[d],d*agg[d]]),['TOTAL',tn,total]];
   const ws2=XLSX.utils.aoa_to_sheet(s2); ws2['!cols']=[{wch:20},{wch:16},{wch:18}];
   XLSX.utils.book_append_sheet(wb,ws2,'Denomination Summary');
   XLSX.writeFile(wb,'BD_Salary_Notes_'+new Date().toISOString().slice(0,10)+'.xlsx');
@@ -575,7 +645,7 @@ function renderSummary(){
   const total=employees.reduce((a,e)=>a+e.salary,0);
   const avg=employees.length?Math.round(total/employees.length):0;
   const agg={}; DENOMS.forEach(d=>agg[d]=0);
-  employees.forEach(emp=>Object.entries(emp.notes).forEach(([d,c])=>agg[parseInt(d)]+=c));
+  employees.forEach(emp=>DENOMS.forEach(d=>{ if(emp.notes[d]) agg[d]+=emp.notes[d]; }));
   const tn=Object.values(agg).reduce((a,b)=>a+b,0);
   document.getElementById('stat-count').textContent=employees.length;
   document.getElementById('stat-total').textContent=fmtBDT(total);
@@ -590,10 +660,15 @@ function renderSummary(){
   const tEl=document.getElementById('full-table-wrap');
   if(!employees.length){ tEl.innerHTML=`<div class="empty-state"><div class="icon">📋</div><p>Add employees first.</p></div>`; return; }
   const dCols=DENOMS.filter(d=>employees.some(e=>e.notes[d]));
-  const hdr=['Employee','Salary',...dCols.map(d=>`৳${d.toLocaleString()}`)].map(h=>`<th>${h}</th>`).join('');
-  const bRows=employees.map(emp=>`<tr><td><b>${emp.name}</b></td><td class="highlight-cell">${fmtBDT(emp.salary)}</td>${dCols.map(d=>`<td>${emp.notes[d]||'—'}</td>`).join('')}</tr>`).join('');
+  const hdr=['Employee','Salary',...dCols.map(d=>`৳${d.toLocaleString()}`),'Paid Amount'].map(h=>`<th>${h}</th>`).join('');
+  const bRows=employees.map(emp=>{
+    const paid=emp.notes['_paid']||emp.salary;
+    const pStyle=paid!==emp.salary?'color:var(--gold);font-weight:600':'';
+    return `<tr><td><b>${emp.name}</b></td><td class="highlight-cell">${fmtBDT(emp.salary)}</td>${dCols.map(d=>`<td>${emp.notes[d]||'—'}</td>`).join('')}<td style="${pStyle}">${fmtBDT(paid)}</td></tr>`;
+  }).join('');
   const ac=dCols.map(d=>`<td class="highlight-cell">${agg[d]||'—'}</td>`).join('');
-  tEl.innerHTML=`<table><thead><tr>${hdr}</tr></thead><tbody>${bRows}<tr class="total-row"><td>TOTAL</td><td>${fmtBDT(total)}</td>${ac}</tr></tbody></table>`;
+  const tPaid=employees.reduce((a,e)=>a+(e.notes['_paid']||e.salary),0);
+  tEl.innerHTML=`<table><thead><tr>${hdr}</tr></thead><tbody>${bRows}<tr class="total-row"><td>TOTAL</td><td>${fmtBDT(total)}</td>${ac}<td>${fmtBDT(tPaid)}</td></tr></tbody></table>`;
 }
 
 /* ── MANUAL ── */
@@ -636,7 +711,7 @@ function selectManualEmp(id){ selectedEmpForManual=id; renderManualEmpList(); }
 
 /* ── SAMPLE / CLEAR ── */
 function loadSample(){
-  [['Karim Hossain',35570],['Nasrin Akter',28250],['Rahim Uddin',52000],['Fatema Begum',18765]].forEach(([name,salary])=>{
+  [['Dipta Das', 50203],['Rahul Ghosh', 50501],['Ratul Ghosh', 52526],['Tanmoy bose',50508]].forEach(([name,salary])=>{
     employees.push({id:Date.now()+Math.random(),name,salary,notes:calcNotes(salary)});
   });
   renderEmployeeList(); showToast('Sample data loaded!');
@@ -648,11 +723,10 @@ function downloadTemplate(){
   const wb=XLSX.utils.book_new();
   const data=[
     ['Employee Name','Salary (BDT ৳)','Department (Optional)'],
-    ['Karim Hossain',35570,'Accounts'],['Nasrin Akter',28250,'HR'],
-    ['Rahim Uddin',52000,'Engineering'],['Fatema Begum',18765,'Operations'],
-    ['Tariq Ahmed',67500,'Management'],['Sumaiya Islam',24300,'Marketing'],
-    ['Mahbub Rahman',41800,'IT'],['Roksana Khanam',31250,'Finance'],
-    ['Jahangir Alam',59900,'Engineering'],['Mitu Sarker',22100,'Operations'],
+    ['Dipta Das', 50203, 'Accounts'],
+    ['Rahul Ghosh', 50501, 'Development'],
+    ['Ratul Ghosh', 52526, 'Engineering'],
+    ['Tanmoy bose', 50508, 'Operations'],
   ];
   const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:26},{wch:20},{wch:24}];
   XLSX.utils.book_append_sheet(wb,ws,'Employee Salaries');
@@ -666,7 +740,7 @@ function downloadTemplate(){
     ['STEP 5','Open the web app → Import Excel tab → Upload this file'],
     ['STEP 6','Click "Process & Download Excel" to get enriched output with notes'],
     ['',''],
-    ['DENOMINATIONS','৳1000, ৳500, ৳200, ৳100, ৳50, ৳20, ৳10, ৳5, ৳2, ৳1'],
+    ['DENOMINATIONS','৳1000, ৳500, ৳100, ৳50, ৳20, ৳10, ৳5, ৳2'],
   ];
   const ws2=XLSX.utils.aoa_to_sheet(inst); ws2['!cols']=[{wch:16},{wch:60}];
   XLSX.utils.book_append_sheet(wb,ws2,'How To Use');
