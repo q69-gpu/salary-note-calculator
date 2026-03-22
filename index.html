@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BD Salary Note Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,600;0,900;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --green: #006a4e; --red: #f42a41; --gold: #e8b84b;
+    --cream: #faf7f0; --dark: #1a1a1a; --muted: #6b6b6b;
+    --border: #e0d8cc; --white: #ffffff; --success: #2a7a5a;
+    --card-shadow: 0 2px 20px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Mono', monospace; background: var(--cream); color: var(--dark); min-height: 100vh; }
+
+  header { background: var(--green); color: white; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,106,78,0.3); }
+  .header-inner { max-width: 1200px; margin: 0 auto; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo-flag { width: 36px; height: 36px; background: var(--red); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 0 0 3px rgba(255,255,255,0.2); flex-shrink: 0; }
+  .logo-text h1 { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 600; }
+  .logo-text p { font-size: 11px; opacity: 0.7; letter-spacing: 1px; text-transform: uppercase; }
+  .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  .tabs { display: flex; gap: 4px; background: var(--border); border-radius: 10px; padding: 4px; margin-bottom: 22px; width: fit-content; flex-wrap: wrap; }
+  .tab { padding: 8px 18px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 13px; color: var(--muted); transition: all 0.2s; font-weight: 500; }
+  .tab.active { background: white; color: var(--green); box-shadow: 0 1px 8px rgba(0,0,0,0.1); }
+  .tab:hover:not(.active) { color: var(--dark); }
+
+  .panel { display: none; } .panel.active { display: block; }
+
+  .card { background: white; border-radius: 14px; box-shadow: var(--card-shadow); border: 1px solid var(--border); padding: 24px; margin-bottom: 20px; }
+  .card-title { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; color: var(--green); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  .input-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: end; margin-bottom: 12px; }
+  @media(max-width:600px){ .input-row { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+  input[type="text"], input[type="number"] { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 14px; color: var(--dark); background: var(--cream); transition: border-color 0.2s, box-shadow 0.2s; outline: none; }
+  input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(0,106,78,0.1); background: white; }
+  input.error { border-color: var(--red); }
+  .error-msg { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
+  .error-msg.show { display: block; }
+
+  .btn { padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; transition: all 0.18s; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .btn-primary { background: var(--green); color: white; box-shadow: 0 2px 8px rgba(0,106,78,0.25); }
+  .btn-primary:hover { background: #005040; transform: translateY(-1px); }
+  .btn-secondary { background: white; color: var(--green); border: 1.5px solid var(--green); }
+  .btn-secondary:hover { background: #f0f9f5; }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-danger:hover { background: #d02535; }
+  .btn-gold { background: var(--gold); color: var(--dark); font-weight: 600; }
+  .btn-gold:hover { background: #d4a33e; transform: translateY(-1px); }
+  .btn-blue { background: #1a6fb5; color: white; }
+  .btn-blue:hover { background: #155a96; transform: translateY(-1px); }
+  .btn-sm { padding: 7px 13px; font-size: 12px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+  /* IMPORT ZONE */
+  .import-zone { border: 2.5px dashed var(--green); border-radius: 14px; padding: 40px 24px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(0,106,78,0.03); position: relative; }
+  .import-zone:hover, .import-zone.dragover { background: rgba(0,106,78,0.08); border-color: var(--gold); }
+  .import-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .import-icon { font-size: 44px; margin-bottom: 12px; }
+  .import-zone h3 { font-family: 'Fraunces', serif; font-size: 18px; color: var(--green); margin-bottom: 6px; }
+  .import-zone p { font-size: 13px; color: var(--muted); }
+  .import-zone .supported { font-size: 11px; color: var(--muted); margin-top: 12px; background: var(--cream); display: inline-block; padding: 4px 14px; border-radius: 20px; }
+
+  /* IMPORT PREVIEW */
+  .import-preview { display: none; margin-top: 22px; }
+  .import-preview.show { display: block; }
+  .preview-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .preview-badge { background: rgba(0,106,78,0.1); color: var(--green); padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .preview-table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); max-height: 300px; overflow-y: auto; }
+
+  /* EMPLOYEE CARDS */
+  .employee-card { background: var(--cream); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 10px; animation: slideIn 0.22s ease; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+  .employee-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .employee-name { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 600; }
+  .employee-salary { font-size: 14px; font-weight: 500; color: var(--green); background: rgba(0,106,78,0.09); padding: 3px 11px; border-radius: 20px; }
+  .notes-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+  .note-chip { display: flex; align-items: center; gap: 5px; background: white; border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; font-size: 12px; }
+  .note-chip .count { font-weight: 600; color: var(--green); font-size: 13px; }
+  .note-chip .denom { color: var(--muted); }
+
+  /* TABLES */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--green); color: white; padding: 10px 13px; text-align: left; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  thead th:first-child { border-radius: 8px 0 0 0; } thead th:last-child { border-radius: 0 8px 0 0; }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody td { padding: 9px 13px; }
+  tbody tr:nth-child(even) { background: #f8f5f0; }
+  .total-row td { font-weight: 600; color: var(--green); background: rgba(0,106,78,0.05) !important; }
+  .highlight-cell { color: var(--green); font-weight: 600; }
+
+  /* SUMMARY */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .summary-stat { background: white; border: 1.5px solid var(--border); border-radius: 12px; padding: 18px; text-align: center; }
+  .summary-stat .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 6px; }
+  .summary-stat .val { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 900; color: var(--green); }
+  .summary-stat .sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  /* MANUAL */
+  .manual-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 11px; margin-bottom: 14px; }
+  .manual-item { display: flex; flex-direction: column; }
+  .manual-total-display { background: var(--cream); border: 2px solid var(--border); border-radius: 10px; padding: 14px 20px; text-align: center; margin-top: 14px; }
+  .manual-total-display .total-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .manual-total-display .total-val { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 900; margin: 5px 0; }
+  .match-badge { display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .match-badge.ok { background: #d4f5e9; color: var(--success); }
+  .match-badge.fail { background: #fde8eb; color: var(--red); }
+
+  .empty-state { text-align: center; padding: 42px 24px; color: var(--muted); }
+  .empty-state .icon { font-size: 44px; margin-bottom: 10px; }
+  .empty-state p { font-size: 13px; }
+
+  .alert { padding: 11px 15px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 9px; line-height: 1.5; }
+  .alert-info { background: #e8f4fd; color: #1a5a8a; border-left: 3px solid #2980b9; }
+  .alert-success { background: #d4f5e9; color: var(--success); border-left: 3px solid var(--success); }
+  .alert-warn { background: #fff8e7; color: #8a6a00; border-left: 3px solid var(--gold); }
+
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .flex-gap { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--dark); color: white; padding: 12px 22px; border-radius: 10px; font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,0.25); transform: translateY(80px); opacity: 0; transition: all 0.3s; z-index: 9999; max-width: 320px; }
+  #toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-flag">৳</div>
+      <div class="logo-text">
+        <h1>Salary Note Calculator</h1>
+        <p>Bangladesh Taka · Cash Denomination Manager</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-blue" onclick="document.getElementById('file-import-hidden').click()">📂 Import Excel</button>
+      <button class="btn btn-gold" onclick="exportExcel()">📥 Export Excel</button>
+    </div>
+  </div>
+</header>
+
+<input type="file" id="file-import-hidden" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFileImport(this.files[0])">
+
+<main>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('input')">➕ Add Employees</button>
+    <button class="tab" onclick="switchTab('import')">📂 Import Excel</button>
+    <button class="tab" onclick="switchTab('summary')">📊 Dashboard</button>
+    <button class="tab" onclick="switchTab('manual')">✍️ Manual Check</button>
+  </div>
+
+  <!-- TAB: ADD -->
+  <div class="panel active" id="panel-input">
+    <div class="card">
+      <div class="card-title"><span>👤</span> Add Employee Salary</div>
+      <div class="input-row">
+        <div>
+          <label>Employee Name</label>
+          <input type="text" id="emp-name" placeholder="e.g. Rahim Uddin" oninput="clearErr('name-err')">
+          <div class="error-msg" id="name-err">Please enter a valid name.</div>
+        </div>
+        <div>
+          <label>Salary Amount (BDT ৳)</label>
+          <input type="number" id="emp-salary" placeholder="e.g. 35570" min="1" step="1" oninput="clearErr('salary-err')" onkeydown="if(event.key==='Enter')addEmployee()">
+          <div class="error-msg" id="salary-err">Enter a valid positive salary amount.</div>
+        </div>
+        <button class="btn btn-primary" onclick="addEmployee()">＋ Add</button>
+      </div>
+      <div class="alert alert-info">💡 Uses greedy algorithm to find minimum notes for all BDT denominations (৳1–৳1000). Press Enter in salary field to add quickly.</div>
+    </div>
+    <div class="card">
+      <div class="section-header">
+        <div class="card-title" style="margin:0"><span>📋</span> Employee List <span id="emp-count-badge" style="font-size:13px;color:var(--muted);font-weight:400"></span></div>
+        <div class="flex-gap">
+          <button class="btn btn-secondary btn-sm" onclick="loadSample()">Load Sample</button>
+          <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 Clear All</button>
+        </div>
+      </div>
+      <div id="employees-list"><div class="empty-state"><div class="icon">📭</div><p>No employees yet. Add one above, import an Excel file, or load sample data.</p></div></div>
+    </div>
+  </div>
+
+  <!-- TAB: IMPORT -->
+  <div class="panel" id="panel-import">
+    <div class="card">
+      <div class="card-title"><span>📂</span> Import Excel File</div>
+      <div class="alert alert-info">
+        📋 <div><b>Smart auto-detection:</b> The app automatically finds the salary column by looking at headers (e.g. "Salary", "Basic Pay", "Amount", "BDT", "Wage") or by detecting which column has numeric values. All other columns — Employee ID, Department, Date, Designation, etc. — are kept exactly as-is. Denomination columns are inserted right after the salary column in the output.</div>
+      </div>
+
+      <div class="import-zone" id="drop-zone"
+        ondragover="event.preventDefault();this.classList.add('dragover')"
+        ondragleave="this.classList.remove('dragover')"
+        ondrop="onDrop(event)">
+        <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFileImport(this.files[0])">
+        <div class="import-icon">📊</div>
+        <h3>Drop your Excel file here</h3>
+        <p>or click anywhere in this box to browse</p>
+        <div class="supported">Supports: .xlsx · .xls · .csv</div>
+      </div>
+
+      <div class="import-preview" id="import-preview">
+        <div class="preview-header">
+          <div>
+            <div class="card-title" style="margin:0"><span>👀</span> Preview — <span id="preview-filename" style="font-size:13px;color:var(--muted);font-weight:400"></span></div>
+            <div id="preview-info" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+          </div>
+          <div class="flex-gap">
+            <span id="preview-badge" class="preview-badge"></span>
+            <button class="btn btn-danger btn-sm" onclick="clearImport()">✕ Clear</button>
+          </div>
+        </div>
+        <div class="preview-table-wrap" id="preview-table-wrap"></div>
+        <div id="import-warnings" style="margin-top:12px"></div>
+        <div style="margin-top:16px;" class="flex-gap">
+          <button class="btn btn-primary" onclick="loadImportedEmployees()">✅ Load Employees into App</button>
+          <button class="btn btn-gold" onclick="importAndExport()">📥 Process &amp; Download Excel</button>
+        </div>
+        <div class="alert alert-info" style="margin-top:14px">
+          💡 <div><b>Process &amp; Download</b> enriches your file with all 10 denomination columns and a summary sheet — ready for bank or payroll use.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span>📄</span> Need a Template?</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Download our demo template with 10 sample employees. Fill in your own data, then import it above.</p>
+      <button class="btn btn-secondary" onclick="downloadTemplate()">⬇ Download Demo Template (.xlsx)</button>
+    </div>
+  </div>
+
+  <!-- TAB: SUMMARY -->
+  <div class="panel" id="panel-summary">
+    <div class="summary-grid">
+      <div class="summary-stat"><div class="lbl">Total Employees</div><div class="val" id="stat-count">0</div></div>
+      <div class="summary-stat"><div class="lbl">Total Payout</div><div class="val" id="stat-total">৳0</div></div>
+      <div class="summary-stat"><div class="lbl">Total Notes</div><div class="val" id="stat-notes">0</div><div class="sub">across all denominations</div></div>
+      <div class="summary-stat"><div class="lbl">Average Salary</div><div class="val" id="stat-avg">৳0</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🏦</span> Denomination Totals</div>
+      <div id="denom-summary-table"><div class="empty-state"><div class="icon">📊</div><p>Add employees to see denomination summary.</p></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>📋</span> Per-Employee Breakdown</div>
+      <div style="overflow-x:auto" id="full-table-wrap"><div class="empty-state"><div class="icon">📋</div><p>Add employees to see breakdown.</p></div></div>
+    </div>
+  </div>
+
+  <!-- TAB: MANUAL -->
+  <div class="panel" id="panel-manual">
+    <div class="card">
+      <div class="card-title"><span>✍️</span> Manual Note Entry</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Enter number of notes per denomination. The system calculates the total and verifies against a target salary.</p>
+      <div>
+        <label>Target Salary (BDT ৳) — optional</label>
+        <input type="number" id="manual-target" placeholder="e.g. 35570" style="max-width:260px;margin-bottom:16px;" oninput="recalcManual()">
+      </div>
+      <div class="manual-grid" id="manual-inputs"></div>
+      <div class="manual-total-display">
+        <div class="total-label">Calculated Total</div>
+        <div class="total-val" id="manual-total" style="color:var(--green)">৳ 0</div>
+        <div id="manual-match-badge"></div>
+      </div>
+      <div style="margin-top:12px" class="flex-gap">
+        <button class="btn btn-secondary btn-sm" onclick="fillManualFromAuto()">↓ Auto-fill from selected employee</button>
+        <button class="btn btn-danger btn-sm" onclick="resetManual()">Reset</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>👥</span> Select Employee to Auto-fill</div>
+      <div id="manual-emp-list"><div class="empty-state"><div class="icon">👤</div><p>Add employees first.</p></div></div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const DENOMS = [1000,500,200,100,50,20,10,5,2,1];
+let employees = [], importedRows = [], selectedEmpForManual = null;
+
+function calcNotes(salary) {
+  let rem=Math.round(salary), notes={};
+  for(const d of DENOMS){ const c=Math.floor(rem/d); if(c>0) notes[d]=c; rem-=c*d; }
+  return notes;
+}
+function fmtBDT(n){ return '৳ '+Number(n).toLocaleString('en-BD'); }
+function showToast(msg,dur=2800){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),dur); }
+function clearErr(id){
+  document.getElementById(id).classList.remove('show');
+  (id==='name-err'?document.getElementById('emp-name'):document.getElementById('emp-salary')).classList.remove('error');
+}
+function switchTab(name){
+  const tabs=['input','import','summary','manual'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',tabs[i]===name));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(name==='summary') renderSummary();
+  if(name==='manual') renderManualEmpList();
+}
+
+/* ── ADD ── */
+function addEmployee(){
+  const nameEl=document.getElementById('emp-name'), salEl=document.getElementById('emp-salary');
+  const name=nameEl.value.trim(), salary=parseInt(salEl.value);
+  let ok=true;
+  if(!name){ document.getElementById('name-err').classList.add('show'); nameEl.classList.add('error'); ok=false; }
+  if(!salEl.value||isNaN(salary)||salary<=0){ document.getElementById('salary-err').classList.add('show'); salEl.classList.add('error'); ok=false; }
+  if(!ok) return;
+  employees.push({id:Date.now()+Math.random(),name,salary,notes:calcNotes(salary)});
+  nameEl.value=''; salEl.value=''; nameEl.focus();
+  renderEmployeeList(); showToast(`✓ ${name} — ${fmtBDT(salary)}`);
+}
+function removeEmployee(id){ employees=employees.filter(e=>e.id!==id); renderEmployeeList(); showToast('Employee removed.'); }
+function renderEmployeeList(){
+  const el=document.getElementById('employees-list');
+  document.getElementById('emp-count-badge').textContent=employees.length?`(${employees.length})`:'';
+  if(!employees.length){ el.innerHTML=`<div class="empty-state"><div class="icon">📭</div><p>No employees yet.</p></div>`; return; }
+  el.innerHTML=employees.map(emp=>{
+    const chips=Object.entries(emp.notes).map(([d,c])=>`<div class="note-chip"><span class="count">${c}</span><span class="denom">× ৳${parseInt(d).toLocaleString()}</span></div>`).join('');
+    return `<div class="employee-card"><div class="employee-header"><div class="employee-name">${emp.name}</div><div style="display:flex;align-items:center;gap:8px;"><div class="employee-salary">${fmtBDT(emp.salary)}</div><button class="btn btn-danger btn-sm" onclick="removeEmployee(${emp.id})">✕</button></div></div><div class="notes-grid">${chips}</div></div>`;
+  }).join('');
+}
+
+/* ── IMPORT ── */
+// Stores the full parsed import context for export use
+let importMeta = { headerRow: 0, salaryColIdx: -1, nameColIdx: -1, headers: [], rawData: [] };
+
+function onDrop(e){ e.preventDefault(); document.getElementById('drop-zone').classList.remove('dragover'); if(e.dataTransfer.files[0]) handleFileImport(e.dataTransfer.files[0]); }
+
+function handleFileImport(file){
+  if(!file) return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['xlsx','xls','csv'].includes(ext)){ showToast('⚠️ Upload a .xlsx, .xls, or .csv file'); return; }
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      processImportedData(raw,file.name);
+    }catch(err){ showToast('❌ Failed to read: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ── DETECTION HELPERS ── */
+const SALARY_KEYWORDS = ['salary','sal','amount','pay','wage','basic','gross','net','taka','bdt','remuneration','compensation','income','মজুরি','বেতন'];
+const NAME_KEYWORDS   = ['name','employee','emp','staff','person','worker','member','নাম'];
+
+function cleanStr(h){ return String(h).toLowerCase().replace(/[^a-z\u0980-\u09ff]/g,''); }
+function isSalaryHeader(h){ const s=cleanStr(h); return SALARY_KEYWORDS.some(k=>s.includes(k)); }
+function isNameHeader(h)  { const s=cleanStr(h); return NAME_KEYWORDS.some(k=>s.includes(k)); }
+function parseSal(v){ return parseFloat(String(v||'').replace(/[,৳\s\u09F3]/g,'')); }
+function isNumericSalary(v){ const n=parseSal(v); return !isNaN(n)&&n>0; }
+
+/* Score a row as a header: more text cells = higher score */
+function headerScore(row){
+  const filled=row.filter(c=>String(c).trim()!=='');
+  if(!filled.length) return 0;
+  const textCells=filled.filter(c=>isNaN(parseSal(c))||String(c).trim().length>10);
+  return textCells.length/filled.length;
+}
+
+/* Find the best header row among first 10 rows: highest text ratio AND has ≥2 filled cells */
+function detectHeaderRow(raw){
+  let best=0, bestScore=-1;
+  for(let i=0;i<Math.min(10,raw.length);i++){
+    const row=raw[i]||[];
+    const filled=row.filter(c=>String(c).trim()!=='');
+    if(filled.length<2) continue;
+    const s=headerScore(row);
+    if(s>bestScore){ bestScore=s; best=i; }
+  }
+  return best;
+}
+
+/* Find salary column: first try header keywords, then find column with most numeric+positive values */
+function detectSalaryCol(headers, dataRows){
+  // 1. Exact/partial header keyword match
+  for(let i=0;i<headers.length;i++) if(isSalaryHeader(headers[i])) return i;
+  // 2. Data heuristic — score each column by how many rows have valid positive numbers > 100
+  let bestCol=-1, bestScore=0;
+  for(let c=0;c<headers.length;c++){
+    const vals=dataRows.map(r=>parseSal((r||[])[c]));
+    const valid=vals.filter(v=>!isNaN(v)&&v>100);
+    const score=vals.length>0?valid.length/vals.length:0;
+    if(score>bestScore){ bestScore=score; bestCol=c; }
+  }
+  return bestScore>0.5?bestCol:-1;
+}
+
+/* Find name column: header keyword, then first text-majority column that isn't salary col */
+function detectNameCol(headers, dataRows, salaryColIdx){
+  for(let i=0;i<headers.length;i++) if(i!==salaryColIdx&&isNameHeader(headers[i])) return i;
+  for(let c=0;c<headers.length;c++){
+    if(c===salaryColIdx) continue;
+    const vals=dataRows.map(r=>String((r||[])[c]||'').trim()).filter(v=>v!=='');
+    const textVals=vals.filter(v=>isNaN(parseSal(v))||v.length>10);
+    if(vals.length>0&&textVals.length/vals.length>0.5) return c;
+  }
+  return salaryColIdx===0?1:0;
+}
+
+function processImportedData(raw, filename){
+  if(!raw||raw.length<2){ showToast('⚠️ File is empty or has no data rows.'); return; }
+
+  const headerRowIdx = detectHeaderRow(raw);
+  const headers = (raw[headerRowIdx]||[]).map(h=>String(h));
+
+  // Data rows = everything after header, skip fully blank rows
+  const dataRows = raw.slice(headerRowIdx+1).filter(r=>r&&r.some(c=>String(c).trim()!==''));
+
+  const salaryColIdx = detectSalaryCol(headers, dataRows);
+  const nameColIdx   = detectNameCol(headers, dataRows, salaryColIdx);
+
+  if(salaryColIdx===-1){
+    showToast('⚠️ Could not detect a salary column. Make sure one column contains numeric salary values.');
+    return;
+  }
+
+  // Save full context for export
+  importMeta = { headerRowIdx, salaryColIdx, nameColIdx, headers, rawData: dataRows };
+
+  const parsed=[], warnings=[];
+  dataRows.forEach((row,ri)=>{
+    const name   = String((row||[])[nameColIdx]||'').trim();
+    const salRaw = String((row||[])[salaryColIdx]||'');
+    const salary = parseSal(salRaw);
+    if(!name){ warnings.push(`Row ${ri+headerRowIdx+2}: Missing name — skipped`); return; }
+    if(isNaN(salary)||salary<=0){ warnings.push(`Row ${ri+headerRowIdx+2}: Invalid salary "${salRaw.trim()||'(empty)'}" for "${name}" — skipped`); return; }
+    parsed.push({ name, salary:Math.round(salary), rawRow:[...(row||[])], notes:calcNotes(Math.round(salary)) });
+  });
+
+  importedRows = parsed;
+  renderImportPreview(filename, headers, salaryColIdx, nameColIdx, warnings);
+  switchTab('import');
+}
+
+function renderImportPreview(filename, headers, salaryColIdx, nameColIdx, warnings){
+  document.getElementById('preview-filename').textContent = filename;
+  document.getElementById('preview-badge').textContent = `${importedRows.length} employees found`;
+  document.getElementById('preview-info').textContent =
+    `Salary column: "${headers[salaryColIdx]}" (col ${salaryColIdx+1}) · Name column: "${headers[nameColIdx]}" (col ${nameColIdx+1}) · Previewing first ${Math.min(importedRows.length,10)} rows`;
+
+  const show = importedRows.slice(0,10);
+  const dCols = DENOMS.filter(d=>show.some(r=>r.notes[d]));
+
+  // Build preview header: original columns + denomination columns inserted after salary col
+  const previewHeaders = ['#'];
+  headers.forEach((h,i)=>{
+    previewHeaders.push(i===salaryColIdx ? `<span style="color:var(--gold);font-weight:700">⭐ ${h}</span>` : h);
+    if(i===salaryColIdx) dCols.forEach(d=>previewHeaders.push(`<span style="color:#a8e6cf">৳${d.toLocaleString()}</span>`));
+  });
+  const hdr = previewHeaders.map(h=>`<th>${h}</th>`).join('');
+
+  const rows = show.map((r,i)=>{
+    let cells = '<td style="color:var(--muted);font-size:11px">'+(i+1)+'</td>';
+    headers.forEach((_,ci)=>{
+      const val = r.rawRow[ci]!==undefined ? r.rawRow[ci] : '';
+      if(ci===salaryColIdx){
+        cells += `<td class="highlight-cell">${fmtBDT(r.salary)}</td>`;
+        dCols.forEach(d=>{ cells += `<td style="color:#2a7a5a">${r.notes[d]||'—'}</td>`; });
+      } else {
+        cells += `<td>${val}</td>`;
+      }
+    });
+    return `<tr>${cells}</tr>`;
+  }).join('');
+
+  document.getElementById('preview-table-wrap').innerHTML =
+    `<table><thead><tr>${hdr}</tr></thead><tbody>${rows}</tbody></table>`;
+
+  const wEl = document.getElementById('import-warnings');
+  wEl.innerHTML = warnings.length
+    ? `<div class="alert alert-warn">⚠️ <div><b>${warnings.length} issue(s):</b><br>${warnings.map(w=>`• ${w}`).join('<br>')}</div></div>`
+    : `<div class="alert alert-success">✅ All rows parsed. Salary auto-detected in column "${importMeta.headers[salaryColIdx]}".</div>`;
+
+  document.getElementById('import-preview').classList.add('show');
+}
+
+function clearImport(){
+  importedRows=[];
+  importMeta={ headerRowIdx:0, salaryColIdx:-1, nameColIdx:-1, headers:[], rawData:[] };
+  document.getElementById('import-preview').classList.remove('show');
+}
+
+function loadImportedEmployees(){
+  if(!importedRows.length){ showToast('No data to load.'); return; }
+  importedRows.forEach(r=>employees.push({id:Date.now()+Math.random(),name:r.name,salary:r.salary,notes:r.notes}));
+  renderEmployeeList(); showToast(`✓ ${importedRows.length} employees loaded!`);
+  clearImport(); switchTab('input');
+}
+
+function importAndExport(){
+  if(!importedRows.length){ showToast('No imported data to process.'); return; }
+  const { headers, salaryColIdx } = importMeta;
+  const dCols = DENOMS.filter(d=>importedRows.some(r=>r.notes[d]));
+
+  // Build output header row: all original columns + denomination cols inserted RIGHT AFTER salary col + total notes col
+  const outHeaders = [];
+  headers.forEach((h,i)=>{
+    outHeaders.push(h);
+    if(i===salaryColIdx){
+      dCols.forEach(d=>outHeaders.push(`৳${d.toLocaleString()} Notes`));
+      outHeaders.push('Total Notes');
+    }
+  });
+
+  // Build data rows: all original cells preserved, denomination cells inserted after salary
+  const data = [outHeaders, ...importedRows.map(r=>{
+    const outRow = [];
+    headers.forEach((_,i)=>{
+      outRow.push(r.rawRow[i]!==undefined ? r.rawRow[i] : '');
+      if(i===salaryColIdx){
+        dCols.forEach(d=>outRow.push(r.notes[d]||0));
+        outRow.push(Object.values(r.notes).reduce((a,b)=>a+b,0));
+      }
+    });
+    return outRow;
+  })];
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(data);
+  // Column widths: original cols 14-22 wide, denomination cols 14 each
+  ws1['!cols'] = outHeaders.map(h=>({wch: String(h).includes('Notes')||String(h).includes('৳')?14:Math.max(14,String(h).length+4)}));
+  XLSX.utils.book_append_sheet(wb, ws1, 'Salary with Notes');
+
+  // Denomination Summary sheet
+  const agg={}; DENOMS.forEach(d=>agg[d]=importedRows.reduce((a,r)=>a+(r.notes[d]||0),0));
+  const totalSal=importedRows.reduce((a,r)=>a+r.salary,0);
+  const totalNotes=DENOMS.reduce((a,d)=>a+agg[d],0);
+  const sum2=[['Denomination (Taka)','Total Notes Required','Subtotal (BDT)'],
+    ...DENOMS.filter(d=>agg[d]>0).map(d=>[d,agg[d],d*agg[d]]),
+    ['GRAND TOTAL',totalNotes,totalSal]];
+  const ws2=XLSX.utils.aoa_to_sheet(sum2); ws2['!cols']=[{wch:22},{wch:22},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Denomination Summary');
+
+  XLSX.writeFile(wb,'BD_Salary_Notes_Processed_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('✓ Processed Excel downloaded!');
+}
+
+/* ── EXPORT (current employees) ── */
+function exportExcel(){
+  if(!employees.length){ showToast('Add employees first.'); return; }
+  const wb=XLSX.utils.book_new();
+  const dCols=DENOMS.filter(d=>employees.some(e=>e.notes[d]));
+  const headers=['Employee Name','Salary (BDT ৳)',...dCols.map(d=>`৳${d.toLocaleString()} Notes`),'Total Notes'];
+  const data=[headers,...employees.map(e=>[e.name,e.salary,...dCols.map(d=>e.notes[d]||0),Object.values(e.notes).reduce((a,b)=>a+b,0)])];
+  const total=employees.reduce((a,e)=>a+e.salary,0);
+  const agg={}; DENOMS.forEach(d=>agg[d]=employees.reduce((a,e)=>a+(e.notes[d]||0),0));
+  const tn=DENOMS.reduce((a,d)=>a+agg[d],0);
+  data.push(['TOTAL',total,...dCols.map(d=>agg[d]||0),tn]);
+  const ws1=XLSX.utils.aoa_to_sheet(data); ws1['!cols']=[{wch:24},{wch:16},...dCols.map(()=>({wch:14})),{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Salary Breakdown');
+  const s2=[['Denomination','Count','Subtotal (BDT)'],...DENOMS.filter(d=>agg[d]>0).map(d=>[d,agg[d],d*agg[d]]),['TOTAL',tn,total]];
+  const ws2=XLSX.utils.aoa_to_sheet(s2); ws2['!cols']=[{wch:20},{wch:16},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Denomination Summary');
+  XLSX.writeFile(wb,'BD_Salary_Notes_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('✓ Excel downloaded!');
+}
+
+/* ── SUMMARY ── */
+function renderSummary(){
+  const total=employees.reduce((a,e)=>a+e.salary,0);
+  const avg=employees.length?Math.round(total/employees.length):0;
+  const agg={}; DENOMS.forEach(d=>agg[d]=0);
+  employees.forEach(emp=>Object.entries(emp.notes).forEach(([d,c])=>agg[parseInt(d)]+=c));
+  const tn=Object.values(agg).reduce((a,b)=>a+b,0);
+  document.getElementById('stat-count').textContent=employees.length;
+  document.getElementById('stat-total').textContent=fmtBDT(total);
+  document.getElementById('stat-notes').textContent=tn.toLocaleString();
+  document.getElementById('stat-avg').textContent=fmtBDT(avg);
+  const dEl=document.getElementById('denom-summary-table');
+  if(!employees.length){ dEl.innerHTML=`<div class="empty-state"><div class="icon">📊</div><p>Add employees first.</p></div>`; }
+  else {
+    const rows=DENOMS.filter(d=>agg[d]>0).map(d=>`<tr><td>৳ ${d.toLocaleString()}</td><td class="highlight-cell">${agg[d].toLocaleString()}</td><td>${fmtBDT(agg[d]*d)}</td></tr>`).join('');
+    dEl.innerHTML=`<table><thead><tr><th>Note Value</th><th>Total Count</th><th>Subtotal</th></tr></thead><tbody>${rows}<tr class="total-row"><td>TOTAL</td><td>${tn.toLocaleString()}</td><td>${fmtBDT(total)}</td></tr></tbody></table>`;
+  }
+  const tEl=document.getElementById('full-table-wrap');
+  if(!employees.length){ tEl.innerHTML=`<div class="empty-state"><div class="icon">📋</div><p>Add employees first.</p></div>`; return; }
+  const dCols=DENOMS.filter(d=>employees.some(e=>e.notes[d]));
+  const hdr=['Employee','Salary',...dCols.map(d=>`৳${d.toLocaleString()}`)].map(h=>`<th>${h}</th>`).join('');
+  const bRows=employees.map(emp=>`<tr><td><b>${emp.name}</b></td><td class="highlight-cell">${fmtBDT(emp.salary)}</td>${dCols.map(d=>`<td>${emp.notes[d]||'—'}</td>`).join('')}</tr>`).join('');
+  const ac=dCols.map(d=>`<td class="highlight-cell">${agg[d]||'—'}</td>`).join('');
+  tEl.innerHTML=`<table><thead><tr>${hdr}</tr></thead><tbody>${bRows}<tr class="total-row"><td>TOTAL</td><td>${fmtBDT(total)}</td>${ac}</tr></tbody></table>`;
+}
+
+/* ── MANUAL ── */
+function initManualInputs(){
+  document.getElementById('manual-inputs').innerHTML=DENOMS.map(d=>`
+    <div class="manual-item"><label>৳${d.toLocaleString()} notes</label><input type="number" id="m-${d}" min="0" value="0" oninput="recalcManual()"></div>`).join('');
+}
+function recalcManual(){
+  let t=0; DENOMS.forEach(d=>{ t+=d*(parseInt(document.getElementById('m-'+d)?.value)||0); });
+  document.getElementById('manual-total').textContent=fmtBDT(t);
+  const target=parseInt(document.getElementById('manual-target').value);
+  const badge=document.getElementById('manual-match-badge');
+  if(!isNaN(target)&&target>0){
+    const diff=t-target;
+    badge.innerHTML=diff===0?`<span class="match-badge ok">✓ Matches target salary</span>`:`<span class="match-badge fail">✗ Difference: ${diff>0?'+':''}${fmtBDT(diff)}</span>`;
+  } else badge.innerHTML='';
+}
+function fillManualFromAuto(){
+  if(!selectedEmpForManual){ showToast('Select an employee below first.'); return; }
+  const emp=employees.find(e=>e.id===selectedEmpForManual); if(!emp) return;
+  DENOMS.forEach(d=>{ const i=document.getElementById('m-'+d); if(i) i.value=emp.notes[d]||0; });
+  document.getElementById('manual-target').value=emp.salary;
+  recalcManual(); showToast(`Filled from ${emp.name}`);
+}
+function resetManual(){
+  DENOMS.forEach(d=>{ const i=document.getElementById('m-'+d); if(i) i.value=0; });
+  document.getElementById('manual-target').value='';
+  document.getElementById('manual-total').textContent='৳ 0';
+  document.getElementById('manual-match-badge').innerHTML='';
+}
+function renderManualEmpList(){
+  const el=document.getElementById('manual-emp-list');
+  if(!employees.length){ el.innerHTML=`<div class="empty-state"><div class="icon">👤</div><p>Add employees first.</p></div>`; return; }
+  el.innerHTML=employees.map(emp=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:8px;margin-bottom:7px;border:1.5px solid ${selectedEmpForManual===emp.id?'var(--green)':'var(--border)'};background:${selectedEmpForManual===emp.id?'rgba(0,106,78,0.06)':'white'};cursor:pointer;" onclick="selectManualEmp(${emp.id})">
+      <b>${emp.name}</b><span style="color:var(--green)">${fmtBDT(emp.salary)}</span>
+    </div>`).join('');
+}
+function selectManualEmp(id){ selectedEmpForManual=id; renderManualEmpList(); }
+
+/* ── SAMPLE / CLEAR ── */
+function loadSample(){
+  [['Karim Hossain',35570],['Nasrin Akter',28250],['Rahim Uddin',52000],['Fatema Begum',18765]].forEach(([name,salary])=>{
+    employees.push({id:Date.now()+Math.random(),name,salary,notes:calcNotes(salary)});
+  });
+  renderEmployeeList(); showToast('Sample data loaded!');
+}
+function clearAll(){ if(!employees.length) return; employees=[]; renderEmployeeList(); showToast('Cleared.'); }
+
+/* ── DOWNLOAD TEMPLATE ── */
+function downloadTemplate(){
+  const wb=XLSX.utils.book_new();
+  const data=[
+    ['Employee Name','Salary (BDT ৳)','Department (Optional)'],
+    ['Karim Hossain',35570,'Accounts'],['Nasrin Akter',28250,'HR'],
+    ['Rahim Uddin',52000,'Engineering'],['Fatema Begum',18765,'Operations'],
+    ['Tariq Ahmed',67500,'Management'],['Sumaiya Islam',24300,'Marketing'],
+    ['Mahbub Rahman',41800,'IT'],['Roksana Khanam',31250,'Finance'],
+    ['Jahangir Alam',59900,'Engineering'],['Mitu Sarker',22100,'Operations'],
+  ];
+  const ws=XLSX.utils.aoa_to_sheet(data); ws['!cols']=[{wch:26},{wch:20},{wch:24}];
+  XLSX.utils.book_append_sheet(wb,ws,'Employee Salaries');
+  const inst=[
+    ['HOW TO USE THIS TEMPLATE',''],
+    ['',''],
+    ['STEP 1','Keep Column A = Employee Name, Column B = Salary (BDT number)'],
+    ['STEP 2','Add your employees. Delete sample rows if needed.'],
+    ['STEP 3','Column C (Department) is optional — add any extra info.'],
+    ['STEP 4','Save as .xlsx'],
+    ['STEP 5','Open the web app → Import Excel tab → Upload this file'],
+    ['STEP 6','Click "Process & Download Excel" to get enriched output with notes'],
+    ['',''],
+    ['DENOMINATIONS','৳1000, ৳500, ৳200, ৳100, ৳50, ৳20, ৳10, ৳5, ৳2, ৳1'],
+  ];
+  const ws2=XLSX.utils.aoa_to_sheet(inst); ws2['!cols']=[{wch:16},{wch:60}];
+  XLSX.utils.book_append_sheet(wb,ws2,'How To Use');
+  XLSX.writeFile(wb,'BD_Salary_Template_Demo.xlsx');
+  showToast('✓ Demo template downloaded!');
+}
+
+/* ── INIT ── */
+initManualInputs();
+</script>
+</body>
+</html>
